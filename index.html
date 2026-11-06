@@ -1,18 +1,823 @@
 <!doctype html>
-<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#111111"><meta name="description" content="Converti immagini in bianco e nero, sul tuo computer e senza costi."><title>Bianco / Nero — Emanuele BDC</title><script>if(location.protocol!=='file:'){const l=document.createElement('link');l.rel='manifest';l.href='./manifest.webmanifest';document.head.append(l)}</script><style>
-*{box-sizing:border-box}body{margin:0;background:#f6f5f1;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:22px}main{max-width:1100px;margin:auto;padding:32px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:2px solid;padding-bottom:24px}.brand{font-weight:900;font-size:clamp(32px,6vw,68px);letter-spacing:-.06em}button,.button{font:inherit;font-weight:700;border:2px solid #111;background:#111;color:white;border-radius:14px;padding:18px 28px;cursor:pointer;min-height:64px}button:disabled{opacity:.5;cursor:wait}button.secondary{color:#111;background:transparent}button:focus-visible,a:focus-visible{outline:4px solid #2155e8;outline-offset:5px}h1{font-size:clamp(38px,7vw,76px);line-height:1.04;letter-spacing:-.05em;margin:36px 0 20px}p{line-height:1.5}.drop{border:3px dashed #777;border-radius:24px;background:white;min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;gap:22px}.drop.over{background:#e8e8e8;border-color:#111}.drop svg{width:70px;height:70px}.drop strong{font-size:clamp(26px,4vw,42px)}.hint{font-size:20px;color:#444;margin:0}.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:24px}.actions button{flex:1}canvas{display:block;max-width:100%;max-height:55vh;object-fit:contain;margin:auto;background:repeating-conic-gradient(#eee 0% 25%,#fff 0% 50%) 0 / 24px 24px;border-radius:12px}.preview{padding:16px;background:white;border:2px solid #111;border-radius:20px}footer{margin-top:36px;border-top:1px solid #aaa;padding:22px 0;line-height:1.6;font-size:20px;color:#444}#status{min-height:32px;font-weight:700}#status.error{color:#a20d0d}[hidden]{display:none!important}@media(max-width:600px){main{padding:22px 16px}header{align-items:flex-start;flex-direction:column}.actions{flex-direction:column}.drop{min-height:310px}button{width:100%}}
-</style></head><body><main><header><div class="brand">BIANCO / NERO</div><button id="install" class="secondary" hidden>Installa app</button></header><section id="upload"><h1>Il colore cambia.<br>La tua foto resta.</h1><p>Trascina un’immagine. Il bianco e nero è pronto in un attimo.</p><div class="drop" id="drop"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" aria-hidden="true"><path d="M32 42V8m-14 14L32 8l14 14M10 40v14h44V40"/></svg><strong>Trascina qui la tua immagine</strong><button id="choose">Scegli immagine</button><p class="hint">JPG, PNG, WebP · fino a 30 MB e 24 megapixel</p></div><input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden></section><section id="result" hidden><h1 id="resultTitle" tabindex="-1">Il tuo bianco e nero.</h1><div class="preview"><canvas id="canvas" aria-label="Anteprima dell’immagine convertita in scala di grigi"></canvas></div><p class="hint" id="details"></p><div class="actions"><button id="png">↓ Scarica PNG</button><button id="jpg">↓ Scarica JPG</button><button id="again" class="secondary">Nuova immagine</button></div></section><p id="status" role="status" aria-live="polite"></p><footer>100% locale · Nessuna API · €0 per conversione<br>Made with ❤️ in Milan by Emanuele BDC</footer></main><script>
-'use strict';
-const $=id=>document.getElementById(id), file=$('file'), drop=$('drop'), canvas=$('canvas'), ctx=canvas.getContext('2d',{willReadFrequently:true});let busy=false,base='immagine',installPrompt;
-function status(message,error=false){$('status').textContent=message;$('status').classList.toggle('error',error)}
-$('choose').onclick=()=>file.click();file.onchange=()=>{if(file.files.length)convert(file.files[0]);file.value=''};
-for(const event of ['dragenter','dragover'])drop.addEventListener(event,e=>{e.preventDefault();drop.classList.add('over')});
-for(const event of ['dragleave','drop'])drop.addEventListener(event,e=>{e.preventDefault();drop.classList.remove('over')});
-drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length!==1){status('Carica una sola immagine alla volta.',true);return}convert(e.dataTransfer.files[0])});
-window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('drop',e=>e.preventDefault());
-async function convert(f){if(busy)return;if(!['image/jpeg','image/png','image/webp'].includes(f.type)){status('Formato non supportato. Scegli un JPG, PNG o WebP.',true);return}if(f.size>30*1024*1024){status('Il file supera 30 MB. Scegli un’immagine più leggera.',true);return}busy=true;$('choose').disabled=true;status('Conversione in corso…');let url=URL.createObjectURL(f);try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('Impossibile leggere questa immagine. Prova un altro file.'));img.src=url});if(!img.naturalWidth||img.naturalWidth*img.naturalHeight>24000000||Math.max(img.naturalWidth,img.naturalHeight)>16384)throw new Error('Immagine troppo grande. Usa al massimo 24 megapixel e 16.384 pixel per lato.');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;ctx.drawImage(img,0,0);const data=ctx.getImageData(0,0,canvas.width,canvas.height);const d=data.data;for(let i=0;i<d.length;i+=4){const gray=Math.round(.2126*d[i]+.7152*d[i+1]+.0722*d[i+2]);d[i]=d[i+1]=d[i+2]=gray}ctx.putImageData(data,0,0);base=f.name.replace(/\.[^.]+$/,'')||'immagine';$('details').textContent=canvas.width+' × '+canvas.height+' px · PNG mantiene la trasparenza; JPG usa uno sfondo bianco.';$('upload').hidden=true;$('result').hidden=false;status('Pronta. Scegli il formato da scaricare.');$('resultTitle').focus()}catch(e){status(e.message||'Conversione non riuscita. Prova un’altra immagine.',true)}finally{URL.revokeObjectURL(url);busy=false;$('choose').disabled=false}}
-function download(type){let target=canvas;if(type==='jpeg'){target=document.createElement('canvas');target.width=canvas.width;target.height=canvas.height;const c=target.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,target.width,target.height);c.drawImage(canvas,0,0)}target.toBlob(blob=>{if(!blob){status('Esportazione non riuscita. Riprova.',true);return}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=base+'-bianco-nero.'+(type==='jpeg'?'jpg':'png');document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);status('Download avviato.')},'image/'+type,.95)}
-$('png').onclick=()=>download('png');$('jpg').onclick=()=>download('jpeg');$('again').onclick=()=>{$('result').hidden=true;$('upload').hidden=false;canvas.width=canvas.height=1;status('');$('choose').focus()};
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('install').hidden=false});$('install').onclick=async()=>{if(!installPrompt)return;await installPrompt.prompt();installPrompt=null;$('install').hidden=true};
-if(location.protocol!=='file:'&&'serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
-</script></body></html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f5">
+  <meta name="description" content="Converti qualsiasi immagine in bianco e nero nel browser. Zero API, zero token, zero costi. PNG e JPG ad alta risoluzione, elaborazione 100% locale.">
+  <title>Bianco / Nero — Zero Token | Emanuele BDC</title>
+  
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="manifest" href="manifest.webmanifest">
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- BDC Theme CSS -->
+  <link rel="stylesheet" href="assets/css/theme.css">
+</head>
+<body class="min-vh-100 d-flex flex-column">
+
+  <!-- Top Navbar in Stile BDC -->
+  <header class="navbar navbar-bdc sticky-top no-print z-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <a href="index.html" class="navbar-brand-wrap" title="Bianco / Nero — Zero Token">
+          <div class="navbar-brand-badge">
+            <i class="bi bi-circle-half"></i>
+          </div>
+          <div>
+            <span class="navbar-brand-title d-block">BIANCO / NERO</span>
+          </div>
+        </a>
+        <span class="badge bg-dark text-white rounded-pill px-3 py-1 d-none d-md-inline-block ms-2">
+          <i class="bi bi-cpu text-warning me-1"></i> Zero Token
+        </span>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-demo btn-sm" id="btnTopDemo" title="Prova subito una demo">
+          <i class="bi bi-lightning-charge-fill text-warning"></i> Demo
+        </button>
+        <button type="button" class="btn btn-outline-dark btn-sm d-none" id="btnInstallPwa" title="Installa come App">
+          <i class="bi bi-download"></i> Installa
+        </button>
+        <button type="button" class="btn btn-outline-dark btn-sm" id="btnShareApp" title="Condividi applicazione">
+          <i class="bi bi-share"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenitore Principale -->
+  <main class="container my-4 my-md-5 flex-grow-1" style="max-width: 960px;">
+
+    <!-- Privacy Callout Banner -->
+    <div class="alert alert-light border border-2 p-3 mb-4 rounded-4 d-flex align-items-center gap-3 bg-white shadow-sm">
+      <div class="bg-dark text-white rounded-circle p-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px;">
+        <i class="bi bi-shield-check text-success fs-4"></i>
+      </div>
+      <div class="flex-grow-1">
+        <p class="mb-0 fw-bold text-dark" style="font-size: 17px;">Elaborazione 100% Locale — Zero Upload su Cloud</p>
+        <p class="mb-0 text-secondary" style="font-size: 16px;">
+          Nessuna chiamata API, zero token consumati, nessun tracciamento. I pixel vengono calcolati istantaneamente nella memoria grafica del tuo browser.
+        </p>
+      </div>
+    </div>
+
+    <!-- SEZIONE 1: Schermata di Caricamento (Dropzone) -->
+    <section id="uploadSection" class="py-2">
+      
+      <div class="card card-bdc p-4 p-md-5 text-center dropzone-box mb-4" id="dropZone" tabindex="0" role="button" aria-label="Area di rilascio immagine. Clicca o trascina un file.">
+        <div class="dropzone-icon">
+          <i class="bi bi-cloud-arrow-up"></i>
+        </div>
+        
+        <div>
+          <h1 class="h2 fw-black mb-2">Trascina qui la tua immagine</h1>
+          <p class="text-secondary mx-auto mb-3" style="max-width: 620px; font-size: 18px;">
+            Puoi selezionare un file dal tuo dispositivo, trascinarlo direttamente qui oppure incollare uno screenshot con <kbd class="px-2 py-1 bg-dark text-white rounded">Cmd+V</kbd>.
+          </p>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-center gap-3 my-2">
+          <button type="button" class="btn btn-dark btn-lg" id="btnChooseFile">
+            <i class="bi bi-folder2-open"></i> Scegli Immagine
+          </button>
+          <button type="button" class="btn btn-demo btn-lg" id="btnCardDemo">
+            <i class="bi bi-lightning-charge-fill text-warning"></i> Carica Demo
+          </button>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+
+        <p class="text-secondary small mb-0 mt-2">
+          <i class="bi bi-check2-circle text-success me-1"></i> Formati supportati: JPEG, PNG, WebP · Fino a 30 MB e 24 megapixel
+        </p>
+      </div>
+
+      <!-- 3 Card Vantaggi BDC -->
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="feature-card">
+            <div class="feature-icon-wrap">
+              <i class="bi bi-cpu text-dark"></i>
+            </div>
+            <h2 class="h5 fw-bold mb-1">Zero Token AI</h2>
+            <p class="small text-secondary mb-0">
+              Nessun costo a consumo, zero chiavi API e nessun abbonamento. Il calcolo è eseguito tramite Canvas 2D.
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="feature-card">
+            <div class="feature-icon-wrap">
+              <i class="bi bi-shield-shaded text-success"></i>
+            </div>
+            <h2 class="h5 fw-bold mb-1">Privacy Assoluta</h2>
+            <p class="small text-secondary mb-0">
+              Le immagini rimangono private sul tuo dispositivo. Nessun server riceve o memorizza i tuoi scatti.
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="feature-card">
+            <div class="feature-icon-wrap">
+              <i class="bi bi-aspect-ratio text-primary"></i>
+            </div>
+            <h2 class="h5 fw-bold mb-1">Qualità Originale</h2>
+            <p class="small text-secondary mb-0">
+              Nessun ridimensionamento o compressione aggressiva. Conserva fedelmente la piena risoluzione originale.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- SEZIONE 2: Schermata Risultato & Workbench (Nascosta finché non si carica una foto) -->
+    <section id="resultSection" class="py-2" hidden>
+      
+      <!-- Toolbar Superiore Risultato -->
+      <div class="card card-bdc p-3 mb-3 bg-white">
+        <div class="row g-2 align-items-center justify-content-between">
+          <div class="col-12 col-md-auto d-flex flex-wrap align-items-center gap-2">
+            <span class="badge bg-dark text-white rounded-pill" id="metaFileName">
+              <i class="bi bi-image me-1"></i> immagine.jpg
+            </span>
+            <span class="badge bg-white text-dark border border-dark rounded-pill" id="metaDimensions">
+              <i class="bi bi-arrows-fullscreen me-1"></i> 0 × 0 px
+            </span>
+            <span class="badge bg-white text-dark border border-dark rounded-pill" id="metaMegapixels">
+              0 MP
+            </span>
+            <span class="badge bg-white text-secondary border border-secondary rounded-pill" id="metaFileSize">
+              0 KB
+            </span>
+          </div>
+
+          <!-- Selettore Modalità Vista (Bianco/Nero vs Originale) -->
+          <div class="col-12 col-md-auto d-flex align-items-center gap-2">
+            <button type="button" class="preset-pill active" id="btnViewGrayscale" title="Visualizza versione in scala di grigi">
+              <i class="bi bi-circle-half"></i> Bianco e Nero
+            </button>
+            <button type="button" class="preset-pill" id="btnViewOriginal" title="Visualizza immagine originale a colori">
+              <i class="bi bi-palette"></i> Originale
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra di Selezione Preset Tonalità -->
+      <div class="card card-bdc p-3 mb-3 bg-white">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold small text-dark"><i class="bi bi-sliders me-1"></i> Tonalità:</span>
+            <div class="d-flex flex-wrap gap-2" role="group" aria-label="Preset tonalità bianco e nero">
+              <button type="button" class="preset-pill active" data-preset="neutral">
+                Neutro (BT.709)
+              </button>
+              <button type="button" class="preset-pill" data-preset="contrast">
+                Alto Contrasto
+              </button>
+              <button type="button" class="preset-pill" data-preset="soft">
+                Argento Morbido
+              </button>
+            </div>
+          </div>
+          <span class="small text-secondary d-none d-md-inline-block">
+            <i class="bi bi-magic me-1"></i> Elaborazione istantanea
+          </span>
+        </div>
+      </div>
+
+      <!-- Area Canvas di Anteprima -->
+      <div class="canvas-container mb-4">
+        <div class="canvas-scacchiera p-2 w-100 text-center">
+          <canvas id="mainCanvas" aria-label="Anteprima dell'immagine elaborata in bianco e nero"></canvas>
+        </div>
+      </div>
+
+      <!-- Barra Azioni Principali (Icone-First & Testo Minimo) -->
+      <div class="card card-bdc p-4 bg-white mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+          
+          <div class="d-flex flex-wrap gap-2 flex-grow-1">
+            <button type="button" class="btn btn-dark btn-lg flex-grow-1" id="btnDownloadPng" title="Scarica PNG ad alta risoluzione (preserva trasparenza)">
+              <i class="bi bi-download"></i> Scarica PNG
+            </button>
+            <button type="button" class="btn btn-dark btn-lg flex-grow-1" id="btnDownloadJpg" title="Scarica JPEG ottimizzato con sfondo bianco (qualità 95%)">
+              <i class="bi bi-download"></i> Scarica JPG
+            </button>
+            <button type="button" class="btn btn-outline-dark btn-lg flex-grow-1" id="btnCopyClipboard" title="Copia l'immagine negli appunti per incollarla ovunque">
+              <i class="bi bi-clipboard"></i> Copia
+            </button>
+          </div>
+
+          <div class="w-100 w-md-auto text-end">
+            <button type="button" class="btn btn-outline-dark btn-lg w-100" id="btnResetAgain" title="Carica un'altra immagine">
+              <i class="bi bi-arrow-repeat"></i> Nuova
+            </button>
+          </div>
+
+        </div>
+        
+        <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <p class="small text-secondary mb-0">
+            <i class="bi bi-info-circle me-1"></i> PNG preserva la trasparenza alfa; JPG applica sfondo bianco puro con qualità al 95%.
+          </p>
+          <span class="badge bg-light text-dark border border-dark rounded-pill" id="actionStatusBadge">
+            Pronto per il download
+          </span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Live Region di Accessibilità -->
+    <div id="liveAnnouncer" class="visually-hidden" role="status" aria-live="polite"></div>
+
+  </main>
+
+  <!-- Toast Notifica Rapida Tattile -->
+  <div id="feedbackToast" class="feedback-toast" role="status" aria-live="polite">
+    <i class="bi bi-check-circle-fill text-warning fs-5"></i>
+    <span id="toastMessage">Operazione completata con successo</span>
+  </div>
+
+  <!-- Footer Istituzionale BDC -->
+  <footer class="py-4 bg-white border-top border-2 border-dark mt-auto no-print">
+    <div class="container text-center">
+      <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-2">
+        <a href="https://emanuelebdc.com" target="_blank" rel="noopener" class="text-dark fw-bold text-decoration-none small">
+          emanuelebdc.com
+        </a>
+        <span class="text-secondary">•</span>
+        <span class="small text-secondary">
+          100% Client-Side · Zero Token · Cloudflare Pages Ready
+        </span>
+        <span class="text-secondary">•</span>
+        <a href="https://github.com/emaf205/bianco-nero-zero-token" target="_blank" rel="noopener" class="text-dark fw-bold text-decoration-none small">
+          <i class="bi bi-github"></i> Repository GitHub
+        </a>
+      </div>
+      <p class="small text-secondary mb-0">
+        Curato e firmato da <strong>Emanuele BDC</strong> — Milano. Riservatezza totale senza tracciamenti.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Script Applicativo Completo (Vanilla ES6+) -->
+  <script>
+    'use strict';
+
+    // Riferimenti DOM
+    const $ = id => document.getElementById(id);
+    const dropZone = $('dropZone');
+    const fileInput = $('fileInput');
+    const btnChooseFile = $('btnChooseFile');
+    const btnCardDemo = $('btnCardDemo');
+    const btnTopDemo = $('btnTopDemo');
+    const btnShareApp = $('btnShareApp');
+    const btnInstallPwa = $('btnInstallPwa');
+    
+    const uploadSection = $('uploadSection');
+    const resultSection = $('resultSection');
+    
+    const mainCanvas = $('mainCanvas');
+    const ctx = mainCanvas.getContext('2d', { willReadFrequently: true });
+    
+    const metaFileName = $('metaFileName');
+    const metaDimensions = $('metaDimensions');
+    const metaMegapixels = $('metaMegapixels');
+    const metaFileSize = $('metaFileSize');
+    const actionStatusBadge = $('actionStatusBadge');
+    
+    const btnViewGrayscale = $('btnViewGrayscale');
+    const btnViewOriginal = $('btnViewOriginal');
+    
+    const btnDownloadPng = $('btnDownloadPng');
+    const btnDownloadJpg = $('btnDownloadJpg');
+    const btnCopyClipboard = $('btnCopyClipboard');
+    const btnResetAgain = $('btnResetAgain');
+    
+    const feedbackToast = $('feedbackToast');
+    const toastMessage = $('toastMessage');
+    const liveAnnouncer = $('liveAnnouncer');
+
+    // Stato applicativo
+    let isBusy = false;
+    let baseFileName = 'immagine';
+    let originalImage = null;
+    let currentPreset = 'neutral';
+    let activeViewMode = 'grayscale'; // 'grayscale' o 'original'
+    let deferredInstallPrompt = null;
+    
+    // Canvas buffer per memorizzare i pixel originali e convertiti
+    let rawPixelData = null;
+
+    // Mostra Toast Visivo
+    function showToast(text, iconClass = 'bi-check-circle-fill text-warning') {
+      toastMessage.textContent = text;
+      feedbackToast.className = 'feedback-toast show';
+      liveAnnouncer.textContent = text;
+      
+      clearTimeout(window._toastTimeout);
+      window._toastTimeout = setTimeout(() => {
+        feedbackToast.className = 'feedback-toast';
+      }, 3200);
+    }
+
+    // Formattazione peso file
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // Gestione selezione file
+    btnChooseFile.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', e => {
+      if (e.target !== btnCardDemo && !btnCardDemo.contains(e.target)) {
+        fileInput.click();
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) {
+        processFile(fileInput.files[0]);
+      }
+      fileInput.value = '';
+    });
+
+    // Drag and Drop sull'area dedicata
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', e => {
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+      if (files.length > 1) {
+        showToast('Carica una sola immagine alla volta.', 'bi-exclamation-triangle-fill text-danger');
+        return;
+      }
+      processFile(files[0]);
+    });
+
+    // Drag and Drop globale sulla finestra
+    window.addEventListener('dragover', e => e.preventDefault());
+    window.addEventListener('drop', e => {
+      e.preventDefault();
+      if (e.target.closest('#dropZone')) return;
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        processFile(files[0]);
+      }
+    });
+
+    // Incolla direttamente dagli appunti (Cmd+V / Ctrl+V)
+    window.addEventListener('paste', e => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processFile(file, 'screenshot-appunti');
+            showToast('Immagine incollata dagli appunti!', 'bi-clipboard-check-fill text-success');
+            break;
+          }
+        }
+      }
+    });
+
+    // Carica Immagine Demo Istantanea
+    function loadDemoImage() {
+      if (isBusy) return;
+      isBusy = true;
+      showToast('Caricamento demo in corso…', 'bi-hourglass-split');
+
+      const width = 1440;
+      const height = 900;
+      const demoCanvas = document.createElement('canvas');
+      demoCanvas.width = width;
+      demoCanvas.height = height;
+      const dCtx = demoCanvas.getContext('2d');
+
+      // Sfondo gradiente dinamico
+      const grad = dCtx.createLinearGradient(0, 0, width, height);
+      grad.addColorStop(0, '#1e3a8a');
+      grad.addColorStop(0.3, '#3b82f6');
+      grad.addColorStop(0.6, '#ec4899');
+      grad.addColorStop(1, '#f97316');
+      dCtx.fillStyle = grad;
+      dCtx.fillRect(0, 0, width, height);
+
+      // Cerchio decorativo
+      dCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      dCtx.beginPath();
+      dCtx.arc(width / 2, height / 2, 300, 0, Math.PI * 2);
+      dCtx.fill();
+
+      // Card interna
+      dCtx.fillStyle = '#0f172a';
+      dCtx.beginPath();
+      if (typeof dCtx.roundRect === 'function') {
+        dCtx.roundRect(180, 200, 540, 480, 24);
+      } else {
+        dCtx.rect(180, 200, 540, 480);
+      }
+      dCtx.fill();
+
+      dCtx.fillStyle = '#ffffff';
+      dCtx.font = 'bold 56px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto';
+      dCtx.fillText('BIANCO / NERO', 230, 330);
+
+      dCtx.font = '500 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto';
+      dCtx.fillStyle = '#94a3b8';
+      dCtx.fillText('Zero Token · In-Browser Canvas', 230, 390);
+
+      dCtx.fillStyle = '#fbbf24';
+      dCtx.fillRect(230, 440, 420, 10);
+
+      // Cerchi cromatici di test
+      const colors = ['#ef4444', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
+      colors.forEach((col, idx) => {
+        dCtx.fillStyle = col;
+        dCtx.beginPath();
+        dCtx.arc(960 + (idx * 80), 450 + (Math.sin(idx * 1.2) * 120), 55, 0, Math.PI * 2);
+        dCtx.fill();
+        dCtx.lineWidth = 5;
+        dCtx.strokeStyle = '#ffffff';
+        dCtx.stroke();
+      });
+
+      // Applica direttamente al workbench
+      baseFileName = 'demo-geometrica-bdc';
+      mainCanvas.width = width;
+      mainCanvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(demoCanvas, 0, 0);
+
+      // Estrai pixel e memorizza
+      rawPixelData = ctx.getImageData(0, 0, width, height);
+
+      // Riferimento per vista originale
+      const demoImg = new Image();
+      demoImg.src = demoCanvas.toDataURL('image/png');
+      originalImage = demoImg;
+
+      // Aggiorna cruscotto metadati
+      metaFileName.innerHTML = `<i class="bi bi-image me-1"></i> ${baseFileName}`;
+      metaDimensions.innerHTML = `<i class="bi bi-arrows-fullscreen me-1"></i> ${width} × ${height} px`;
+      metaMegapixels.textContent = '1.3 MP';
+      metaFileSize.textContent = '~ 850 KB';
+
+      // Applica bianco e nero
+      currentPreset = 'neutral';
+      activeViewMode = 'grayscale';
+      updateViewToggles();
+      applyGrayscale();
+
+      // Transizione schermo
+      uploadSection.hidden = true;
+      resultSection.hidden = false;
+      actionStatusBadge.textContent = 'Pronto per il download';
+      isBusy = false;
+      showToast('Demo caricata con successo!', 'bi-lightning-charge-fill text-warning');
+    }
+
+    btnCardDemo.addEventListener('click', e => {
+      e.stopPropagation();
+      loadDemoImage();
+    });
+    btnTopDemo.addEventListener('click', loadDemoImage);
+
+    // Elaborazione File Immagine
+    async function processFile(file, fallbackName = '') {
+      if (isBusy) return;
+
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        showToast('Formato non supportato. Usa JPG, PNG o WebP.', 'bi-exclamation-octagon-fill text-danger');
+        return;
+      }
+
+      if (file.size > 30 * 1024 * 1024) {
+        showToast('File troppo pesante (> 30 MB).', 'bi-exclamation-octagon-fill text-danger');
+        return;
+      }
+
+      isBusy = true;
+      btnChooseFile.disabled = true;
+      showToast('Elaborazione immagine…', 'bi-hourglass-split');
+
+      baseFileName = file.name ? file.name.replace(/\.[^.]+$/, '') : (fallbackName || 'immagine');
+      const blobUrl = URL.createObjectURL(file);
+
+      try {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => reject(new Error('Impossibile caricare questa immagine.'));
+          img.src = blobUrl;
+        });
+
+        const width = img.naturalWidth;
+        const height = img.naturalHeight;
+
+        if (!width || !height) {
+          throw new Error('Dimensioni immagine non valide.');
+        }
+
+        if (width * height > 24000000 || Math.max(width, height) > 16384) {
+          throw new Error('Immagine troppo grande (max 24 MP / 16.384px per lato).');
+        }
+
+        // Salva riferimento immagine originale
+        originalImage = img;
+
+        // Inizializza canvas
+        mainCanvas.width = width;
+        mainCanvas.height = height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0);
+
+        // Estrai pixel sorgente
+        rawPixelData = ctx.getImageData(0, 0, width, height);
+
+        // Aggiorna metadati nel cruscotto
+        metaFileName.innerHTML = `<i class="bi bi-image me-1"></i> ${baseFileName}`;
+        metaDimensions.innerHTML = `<i class="bi bi-arrows-fullscreen me-1"></i> ${width.toLocaleString()} × ${height.toLocaleString()} px`;
+        const mp = ((width * height) / 1000000).toFixed(1);
+        metaMegapixels.textContent = `${mp} MP`;
+        metaFileSize.textContent = formatBytes(file.size);
+
+        // Applica conversione predefinita
+        currentPreset = 'neutral';
+        activeViewMode = 'grayscale';
+        updateViewToggles();
+        applyGrayscale();
+
+        // Switch schermata
+        uploadSection.hidden = true;
+        resultSection.hidden = false;
+        actionStatusBadge.textContent = 'Pronto per il download';
+        showToast('Conversione completata!', 'bi-check2-circle text-success');
+
+      } catch (err) {
+        showToast(err.message || 'Errore durante la conversione.', 'bi-exclamation-circle-fill text-danger');
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+        isBusy = false;
+        btnChooseFile.disabled = false;
+      }
+    }
+
+    // Algoritmo di Conversione in Scala di Grigi (Rec. 709 BT.709)
+    function applyGrayscale() {
+      if (!rawPixelData) return;
+
+      const imgData = new ImageData(
+        new Uint8ClampedArray(rawPixelData.data),
+        rawPixelData.width,
+        rawPixelData.height
+      );
+      const d = imgData.data;
+      const len = d.length;
+
+      if (currentPreset === 'neutral') {
+        // Pura formula ITU-R BT.709
+        for (let i = 0; i < len; i += 4) {
+          const gray = Math.round(0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]);
+          d[i] = gray;
+          d[i + 1] = gray;
+          d[i + 2] = gray;
+        }
+      } else if (currentPreset === 'contrast') {
+        // Curva a S ad alto contrasto per neri profondi
+        for (let i = 0; i < len; i += 4) {
+          let gray = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          // Normalizzazione [0, 1] ed espansione di contrasto
+          let norm = gray / 255;
+          norm = (norm - 0.5) * 1.35 + 0.5;
+          gray = Math.round(Math.min(255, Math.max(0, norm * 255)));
+          d[i] = gray;
+          d[i + 1] = gray;
+          d[i + 2] = gray;
+        }
+      } else if (currentPreset === 'soft') {
+        // Tonalità argento morbida con ombre sollevate
+        for (let i = 0; i < len; i += 4) {
+          let gray = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          let norm = gray / 255;
+          norm = Math.pow(norm, 0.88); // Schiarita dolce delle ombre
+          gray = Math.round(Math.min(255, Math.max(0, norm * 255)));
+          d[i] = gray;
+          d[i + 1] = gray;
+          d[i + 2] = gray;
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    // Renderizza Originale a Colori
+    function renderOriginal() {
+      if (!originalImage) return;
+      ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+      ctx.drawImage(originalImage, 0, 0);
+    }
+
+    // Toggle Vista (Bianco/Nero vs Originale)
+    function updateViewToggles() {
+      if (activeViewMode === 'grayscale') {
+        btnViewGrayscale.classList.add('active');
+        btnViewOriginal.classList.remove('active');
+      } else {
+        btnViewOriginal.classList.add('active');
+        btnViewGrayscale.classList.remove('active');
+      }
+    }
+
+    btnViewGrayscale.addEventListener('click', () => {
+      activeViewMode = 'grayscale';
+      updateViewToggles();
+      applyGrayscale();
+      showToast('Vista Bianco e Nero attiva');
+    });
+
+    btnViewOriginal.addEventListener('click', () => {
+      activeViewMode = 'original';
+      updateViewToggles();
+      renderOriginal();
+      showToast('Vista Originale a colori');
+    });
+
+    // Gestione Preset Tonalità
+    document.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-preset]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentPreset = btn.getAttribute('data-preset');
+        activeViewMode = 'grayscale';
+        updateViewToggles();
+        applyGrayscale();
+        showToast(`Preset tonalità: ${btn.textContent.trim()}`);
+      });
+    });
+
+    // Funzione Download Esportazione
+    function exportImage(format) {
+      if (!mainCanvas || mainCanvas.width === 0) return;
+      
+      // Assicurati che l'esportazione contenga il bianco e nero anche se l'utente guardava l'originale
+      if (activeViewMode !== 'grayscale') {
+        applyGrayscale();
+        activeViewMode = 'grayscale';
+        updateViewToggles();
+      }
+
+      let exportCanvas = mainCanvas;
+
+      if (format === 'jpeg') {
+        exportCanvas = document.createElement('canvas');
+        exportCanvas.width = mainCanvas.width;
+        exportCanvas.height = mainCanvas.height;
+        const eCtx = exportCanvas.getContext('2d');
+        eCtx.fillStyle = '#ffffff';
+        eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        eCtx.drawImage(mainCanvas, 0, 0);
+      }
+
+      const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const quality = format === 'jpeg' ? 0.95 : undefined;
+      const ext = format === 'jpeg' ? 'jpg' : 'png';
+
+      exportCanvas.toBlob(blob => {
+        if (!blob) {
+          showToast('Errore durante la creazione del file.', 'bi-exclamation-triangle-fill text-danger');
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseFileName}-bianco-nero.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+        actionStatusBadge.textContent = `Scaricato ${ext.toUpperCase()}`;
+        showToast(`Download ${ext.toUpperCase()} completato!`, 'bi-check2-circle text-success');
+      }, mimeType, quality);
+    }
+
+    btnDownloadPng.addEventListener('click', () => exportImage('png'));
+    btnDownloadJpg.addEventListener('click', () => exportImage('jpeg'));
+
+    // Copia Negli Appunti (PNG ClipboardItem)
+    btnCopyClipboard.addEventListener('click', async () => {
+      if (!mainCanvas || mainCanvas.width === 0) return;
+
+      if (activeViewMode !== 'grayscale') {
+        applyGrayscale();
+        activeViewMode = 'grayscale';
+        updateViewToggles();
+      }
+
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        showToast('Appunti non supportati su questo browser. Usa Scarica PNG.', 'bi-exclamation-circle text-danger');
+        return;
+      }
+
+      try {
+        mainCanvas.toBlob(async blob => {
+          if (!blob) throw new Error('Blob non valido');
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          actionStatusBadge.textContent = 'Copiato negli appunti';
+          showToast('Immagine copiata negli appunti! Pronta per Cmd+V', 'bi-clipboard-check-fill text-warning');
+        }, 'image/png');
+      } catch (err) {
+        showToast('Impossibile copiare. Prova a scaricare il PNG.', 'bi-exclamation-circle text-danger');
+      }
+    });
+
+    // Reset per Nuova Immagine
+    btnResetAgain.addEventListener('click', () => {
+      resultSection.hidden = true;
+      uploadSection.hidden = false;
+      mainCanvas.width = 1;
+      mainCanvas.height = 1;
+      rawPixelData = null;
+      originalImage = null;
+      baseFileName = 'immagine';
+      actionStatusBadge.textContent = 'In attesa di file';
+      showToast('Pronto per una nuova immagine.');
+      btnChooseFile.focus();
+    });
+
+    // Condivisione Applicazione
+    btnShareApp.addEventListener('click', async () => {
+      const shareData = {
+        title: 'Bianco / Nero — Zero Token',
+        text: 'Converti immagini in bianco e nero direttamente nel browser. 100% Locale, zero token AI.',
+        url: window.location.href
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+        } catch (e) {}
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast('Link copiato negli appunti!', 'bi-link-45deg text-success');
+      }
+    });
+
+    // Installazione PWA
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      btnInstallPwa.classList.remove('d-none');
+    });
+
+    btnInstallPwa.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      await deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        showToast('Applicazione installata con successo!');
+      }
+      deferredInstallPrompt = null;
+      btnInstallPwa.classList.add('d-none');
+    });
+
+    // Registrazione Service Worker
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.warn('SW fallito:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
