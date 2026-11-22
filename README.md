@@ -9,6 +9,7 @@
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-emanuelebdc%2Fbianco--nero--zero--token-black?style=for-the-badge&logo=github&logoColor=white)](https://github.com/emanuelebdc/bianco-nero-zero-token)
 [![Live Web Tool](https://img.shields.io/badge/Live_Tool-emanuelebdc.com%2Fideas%2Fbianco--nero--zero--token-dfff00?style=for-the-badge&logo=googlechrome&logoColor=000000)](https://emanuelebdc.com/ideas/bianco-nero-zero-token/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub_Pages-emanuelebdc.github.io%2Fbianco--nero--zero--token-dfff00?style=for-the-badge&logo=github&logoColor=000000)](https://emanuelebdc.github.io/bianco-nero-zero-token/)
 [![Zero Token](https://img.shields.io/badge/Costo-Zero_Token_%2F_Zero_API-10b981?style=for-the-badge)](https://github.com/emanuelebdc/bianco-nero-zero-token)
 [![Offline PWA](https://img.shields.io/badge/PWA-100%25_Offline_Ready-0284c7?style=for-the-badge)](https://github.com/emanuelebdc/bianco-nero-zero-token)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25_Sandbox_Locale-black?style=for-the-badge)](https://github.com/emanuelebdc/bianco-nero-zero-token)
