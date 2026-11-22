@@ -1,7 +1,7 @@
 # Bianco / Nero — Zero Token // PWA di Conversione Locale
 
 <p align="center">
-  <img src="docs/cover.png" alt="Bianco / Nero Zero Token Cover Artwork" width="100%">
+  <img src="assets/social-preview.jpg" alt="Bianco / Nero Zero Token Cover Artwork" width="100%">
 </p>
 
 > **«Perché consumare token API e inviare immagini personali a server esterni quando il browser può convertire un file in scala di grigi in 2 millisecondi con totale privacy locale?»**  
@@ -33,8 +33,8 @@ L'applicazione carica l'immagine nella memoria grafica locale del browser, appli
 ## ✦ Interfaccia & Screenshot Reali
 
 <p align="center">
-  <img src="docs/screenshot-home.jpg" alt="Schermata di Caricamento Iniziale" width="49%">
-  <img src="docs/screenshot-result.jpg" alt="Schermata del Risultato in Scala di Grigi" width="49%">
+  <img src="assets/screenshot-home.jpg" alt="Schermata di Caricamento Iniziale" width="49%">
+  <img src="assets/screenshot-result.jpg" alt="Schermata del Risultato in Scala di Grigi" width="49%">
 </p>
 
 *Nota: La copertina artistica concettuale è generata per la documentazione visiva; la conversione all'interno della web app opera tramite matematica deterministica su Canvas e non fa uso di AI.*
